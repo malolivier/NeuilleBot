@@ -1,0 +1,36 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+venv/
+.env
+
+# --- Données ---
+data/**
+!data/**/.gitkeep
+*.pgn
+*.pgn.zst
+*.h5
+*.csv
+
+# --- Modèles et Artefacts ---
+models/*.pt
+models/*.pth
+models/*.onnx
+logs/
+outputs/
+
+# --- Exécutables & Engines ---
+stockfish*
+*.exe
+*.bin
+
+# --- IDE & OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Notebooks ---
+.ipynb_checkpoints

@@ -1,0 +1,19 @@
+# --- Core Chess Logic ---
+chess==1.10.0          # La bibliothèque standard python-chess
+zstandard==0.22.0      # Pour décompresser les fichiers PGN de Lichess (.pgn.zst)
+
+# --- Deep Learning Stack ---
+torch>=2.2.0           # PyTorch (standard pour les Transformers)
+torchvision
+torchaudio
+einops>=0.7.0          # Essentiel pour manipuler les dimensions des tenseurs (Transformer style)
+
+# --- Data Engineering & Performance ---
+numpy>=1.26.0
+pandas>=2.1.0
+h5py>=3.10.0           # Format de stockage haute performance pour les datasets
+tqdm>=4.66.0           # Barres de progression pour le parsing PGN
+
+# --- Utils ---
+python-dotenv          # Gestion des variables d'environnement (chemins Stockfish, etc.)
+matplotlib             # Pour visualiser les courbes de perte (Loss)
