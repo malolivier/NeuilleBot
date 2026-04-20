@@ -1,0 +1,50 @@
+# NeuilleBot — Lichess configuration
+# Copy this file to `lichess-bot/config.yml` and replace the token below
+# with your own Lichess OAuth token (see lichess-bot/SETUP.md).
+
+token: "YOUR_LICHESS_OAUTH_TOKEN_HERE"
+url: "https://lichess.org/"
+
+engine:
+  dir: "./engines/"
+  name: "homemade"
+  protocol: "homemade"
+  working_dir: ""
+  debug: false
+  ponder: true
+
+  draw_or_resign:
+    resign_enabled: false
+    resign_score: -1000
+    resign_for_egtb_minus_two: true
+    resign_moves: 3
+    offer_draw_enabled: false
+    offer_draw_score: 0
+    offer_draw_for_egtb_zero: true
+    offer_draw_moves: 10
+
+challenge:
+  concurrency: 1
+  sort_by: "best"
+  preference: "none"
+  accept_bot: true
+  only_bot: false
+  max_increment: 180
+  min_increment: 0
+  max_base: 10800
+  min_base: 0
+  variants:
+    - standard
+  time_controls:
+    - bullet
+    - blitz
+    - rapid
+    - classical
+    - correspondence
+  max_days: .inf
+  min_days: 1
+  modes:
+    - casual
+    - rated
+  bullet_requires_increment: false
+  max_simultaneous_games_per_user: 5

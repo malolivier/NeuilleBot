@@ -59,27 +59,102 @@ class ChessEngine:
         return sorted(moves, key=lambda m: self.move_order_value(board, m), reverse=True)
 
     def evaluate_board(self, board):
-        # --- 1. Gérer les états terminaux (Priorité absolue) ---
-        if board.is_checkmate():
-            # Si c'est au tour des Noirs de jouer, les Blancs ont gagné (+1)
-            # Si c'est au tour des Blancs de jouer, les Noirs ont gagné (-1)
-            return 1.0 if board.turn == chess.BLACK else -1.0
-        
-        if board.is_stalemate() or board.is_insufficient_material():
-            return 0.0 # Match nul
+        """
+        Évalue une position. Retourne TOUJOURS un score en WHITE PERSPECTIVE :
+        + = blanc gagne, - = noir gagne.
 
-        # --- 2. Si la partie continue, on demande au Transformer ---
+        Le modèle sort en side-to-move (labels score.relative de Stockfish).
+        Si c'est aux Noirs → on inverse pour obtenir la white-perspective.
+        """
+        if board.is_checkmate():
+            return 1.0 if board.turn == chess.BLACK else -1.0
+
+        if board.is_stalemate() or board.is_insufficient_material():
+            return 0.0
+
         tensor = self.encoder.board_to_tensor(board).unsqueeze(0).to(self.device)
         with torch.no_grad():
             score = self.model(tensor).item()
-        
-        # On "clappe" le score du modèle pour qu'il ne dépasse jamais 
-        # la valeur d'un vrai Mat (0.99 max)
-        return max(min(score, 0.99), -0.99)
+
+        score = max(min(score, 0.99), -0.99)
+        if board.turn == chess.BLACK:
+            score = -score
+        return score
+
+    # Quiescence search : encore expérimental (le modèle évalue mal certaines
+    # positions Black-to-move, ce qui produit des blunders quand on prolonge
+    # la recherche tactique). À réactiver après un réentraînement avec encoding
+    # side-to-move propre (plateau miroité quand Black joue).
+    USE_QUIESCENCE = False
+    QUIESCENCE_MAX_DEPTH = 8
+
+    def get_tactical_moves(self, board):
+        """Retourne uniquement les captures + promotions, triées par MVV/LVA.
+        Pas de push/pop pour les échecs → plus rapide que get_sorted_moves."""
+        moves = [m for m in board.legal_moves if board.is_capture(m) or m.promotion]
+
+        def order(move):
+            score = 0
+            if board.is_capture(move):
+                victim_value = self.PIECE_VALUES.get(board.piece_type_at(move.to_square), 0)
+                attacker_value = self.PIECE_VALUES.get(board.piece_type_at(move.from_square), 0)
+                score += 1000 + victim_value - attacker_value
+            if move.promotion:
+                score += 400 + self.PIECE_VALUES.get(move.promotion, 0)
+            return score
+
+        return sorted(moves, key=order, reverse=True)
+
+    def quiescence(self, board, alpha, beta, maximizing_player, q_depth=0):
+        """
+        Quiescence search : prolonge la recherche tant qu'il y a des coups tactiques
+        (captures, promotions) pour éviter l'effet d'horizon.
+
+        Principe du 'stand pat' : si l'évaluation statique est déjà suffisante
+        pour provoquer un cutoff, on peut couper sans explorer les captures
+        (on suppose qu'on peut toujours "ne rien faire" et garder le stand_pat).
+        """
+        stand_pat = self.evaluate_board(board)
+
+        if q_depth >= self.QUIESCENCE_MAX_DEPTH or board.is_game_over():
+            return stand_pat
+
+        if maximizing_player:
+            if stand_pat >= beta:
+                return stand_pat
+            if stand_pat > alpha:
+                alpha = stand_pat
+            for move in self.get_tactical_moves(board):
+                board.push(move)
+                score = self.quiescence(board, alpha, beta, False, q_depth + 1)
+                board.pop()
+                if score > alpha:
+                    alpha = score
+                if alpha >= beta:
+                    break
+            return alpha
+        else:
+            if stand_pat <= alpha:
+                return stand_pat
+            if stand_pat < beta:
+                beta = stand_pat
+            for move in self.get_tactical_moves(board):
+                board.push(move)
+                score = self.quiescence(board, alpha, beta, True, q_depth + 1)
+                board.pop()
+                if score < beta:
+                    beta = score
+                if alpha >= beta:
+                    break
+            return beta
 
     def minimax(self, board, depth, alpha, beta, maximizing_player):
-        """L'algorithme de recherche Alpha-Beta avec move ordering."""
-        if depth == 0 or board.is_game_over():
+        """Alpha-Beta avec move ordering + quiescence aux feuilles."""
+        if board.is_game_over():
+            return self.evaluate_board(board)
+        if depth == 0:
+            if self.USE_QUIESCENCE:
+                return self.quiescence(board, alpha, beta, maximizing_player)
             return self.evaluate_board(board)
 
         # Trier les coups par ordre de priorité (move ordering)
@@ -125,7 +200,9 @@ class ChessEngine:
         for move in moves:
             board.push(move)
             # Appel minimax avec alpha/beta pour élagage en profondeur
-            board_value = self.minimax(board, depth - 1, -float('inf'), float('inf'), not board.turn)
+            # Après board.push(move), board.turn = adversaire.
+            # WHITE (True) doit maximiser, BLACK (False) doit minimiser → maximizing_player = board.turn
+            board_value = self.minimax(board, depth - 1, -float('inf'), float('inf'), board.turn)
             board.pop()
 
             # Mettre à jour le meilleur coup trouvé (sans élagage)

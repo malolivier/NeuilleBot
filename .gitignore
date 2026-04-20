@@ -29,8 +29,13 @@ stockfish*
 # --- IDE & OS ---
 .vscode/
 .idea/
+.claude/
 .DS_Store
 Thumbs.db
+
+# --- lichess-bot framework (third-party, cloned locally) ---
+# Custom integration files live in lichess_integration/
+lichess-bot/
 
 # --- Notebooks ---
 .ipynb_checkpoints
